@@ -38,7 +38,32 @@ export interface UserPhoto {
 }
 
 export const usePhotoGallery = () => {
+  const PHOTO_STORAGE = 'photos'
   const photos = ref<UserPhoto[]>([])
+
+  const cachePhotos = () => {
+    Preferences.set({
+      key: PHOTO_STORAGE,
+      value: JSON.stringify(photos.value)
+    })
+  }
+
+  watch(photos, cachePhotos)
+
+  const loadSaved = async () => {
+    const photoList = await Preferences.get({ key: PHOTO_STORAGE })
+    const photosInPreferences = photoList.value ? JSON.parse(photoList.value) : []
+
+    for (const photo of photosInPreferences) {
+      const file = await Filesystem.readFile({
+        path: photo.filepath,
+        directory: Directory.Data
+      })
+      photo.webviewPath = `data:image/jpeg;base64,${file.data}`
+    }
+
+    photos.value = photosInPreferences
+  }
 
   const takePhoto = async () => {
     const photo = await Camera.getPhoto({
@@ -52,6 +77,8 @@ export const usePhotoGallery = () => {
 
     photos.value = [savedFileImage, ...photos.value]
   }
+
+  onMounted(loadSaved)
 
   return { photos, takePhoto }
 }
